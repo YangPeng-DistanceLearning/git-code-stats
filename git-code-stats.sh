@@ -67,7 +67,17 @@ while [[ $# -gt 0 ]]; do
 done
 
 # 定义代码扩展名
-CODE_EXTS=("java" "go" "py" "vue" "js" "ts" "jsx" "tsx" "xml" "yml")
+CODE_EXTS=("java" "go" "py" "vue" "js" "ts" "jsx" "tsx" "wxml" "wxss" "xml" "yml" "yaml" "pom" "env" "json")
+
+# 定义需要排除的文件
+EXCLUDE_PATTERNS=(
+  "*.pb.go"           # protobuf 生成的 Go 文件
+  "*.pb.gw.go"        # protobuf gateway 生成的文件
+  "*.gen.go"          # protobuf 生成的 Go 文件
+  "*.pb.java"         # protobuf 生成的 Java 文件
+  "*.min.js"          # 压缩的 JS 文件
+  "*.min.css"         # 压缩的 CSS 文件
+)
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
   echo "❌ 配置文件不存在: $CONFIG_FILE"
@@ -132,6 +142,12 @@ done
 
 ext_regex="\\\\.("$(IFS="|"; echo "${CODE_EXTS[*]}")")\$"
 
+# 将排除的文件序列化为字符串传给 awk
+exclude_patterns_str=""
+for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+  exclude_patterns_str+="${pattern};"
+done
+
 # 多仓库统计，合并结果
 {
   for repo_path in "${REPOS_LIST[@]}"; do
@@ -145,7 +161,35 @@ ext_regex="\\\\.("$(IFS="|"; echo "${CODE_EXTS[*]}")")\$"
       git log --since="$START_DATE" --until="$END_DATE" --pretty="%ad%x09%an" --date=format:"%Y-%m" --numstat
     )
   done
-} | awk -v exts="$ext_regex" -v am="$author_map_str" '
+} | awk -v exts="$ext_regex" -v am="$author_map_str" -v excludes="$exclude_patterns_str" '
+  # 检查文件是否应该被排除
+  function should_exclude(filepath) {
+    # 将排除模式字符串分割成数组
+    split(excludes, patterns, ";")
+    for (i in patterns) {
+      if (patterns[i] == "") continue
+      pattern = patterns[i]
+      
+      # 处理目录模式（以/结尾）
+      if (match(pattern, /\/$/)) {
+        if (index(filepath, pattern) > 0) return 1
+      }
+      # 处理通配符模式
+      else if (index(pattern, "*") > 0) {
+        # 将通配符转换为正则表达式
+        regex_pattern = pattern
+        gsub(/\./, "\\.", regex_pattern)  # 转义点号
+        gsub(/\*/, ".*", regex_pattern)   # 转换星号为.*
+        if (filepath ~ regex_pattern) return 1
+      }
+      # 处理精确匹配
+      else {
+        if (filepath == pattern) return 1
+      }
+    }
+    return 0
+  }
+
   # 计算字符串显示宽度（考虑中文字符占两个位置）
   function strwidth(s) {
     w = 0
@@ -247,6 +291,11 @@ ext_regex="\\\\.("$(IFS="|"; echo "${CODE_EXTS[*]}")")\$"
   }
 
   $1 ~ /^[0-9]+$/ && $2 ~ /^[0-9]+$/ && $3 ~ exts {
+    # 检查文件是否应该被排除
+    if (should_exclude($3)) {
+      next
+    }
+
     author_key = tolower(curr_author)
     author_name = (author_key in author_map) ? author_map[author_key] : curr_author
 
