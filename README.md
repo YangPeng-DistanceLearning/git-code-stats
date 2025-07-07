@@ -96,7 +96,7 @@ jane.smith = 李四
 ```
 
 
-### 支持的文件类型
+### 支持的文件类型与文件过滤
 
 默认统计以下类型的文件：
 
@@ -108,10 +108,23 @@ jane.smith = 李四
 - TypeScript (`.ts`)
 - JSX (`.jsx`)
 - TSX (`.tsx`)
-- XML (`.xml`)
-- YAML (`.yml`)
+- WXML (.wxml)
+- WXSS (.wxss)
+- XML (.xml)
+- YAML (.yml, .yaml)
+- POM (.pom)
+- ENV (.env)
+- JSON (.json)
 
 如需添加更多文件类型，可修改脚本中的 `CODE_EXTS` 数组。
+
+** 文件过滤支持 **
+脚本内置支持自动排除以下常见无需统计的文件类型：
+
+- Protobuf 生成文件（如 *.pb.go, *.pb.gw.go, *.gen.go, *.pb.java）
+- 压缩文件（如 *.min.js, *.min.css）
+
+如需自定义排除其他文件类型，可修改脚本中的 `EXCLUDE_PATTERNS `数组。
 
 ### 输出示例
 
